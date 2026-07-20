@@ -8,6 +8,8 @@ from typing import Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from app.models import Card
+
 SLUG_PATTERN = re.compile(r"^[a-z0-9-]{3,40}$")
 
 # Зарезервированные slug'и (совпадают с frontend-маршрутами)
@@ -100,6 +102,12 @@ class PublicCardOut(BaseModel):
     links: list[LinkIn]
     theme: str
     avatar_url: Optional[str]
+
+
+def card_to_out(card: Card) -> CardOut:
+    """ORM → CardOut, добавляя вычисляемый public_url."""
+    columns = {c.name: getattr(card, c.name) for c in card.__table__.columns}
+    return CardOut.model_validate({**columns, "public_url": f"/u/{card.slug}"})
 
 
 class SlugCheckOut(BaseModel):

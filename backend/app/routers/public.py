@@ -27,7 +27,8 @@ def get_public_card(slug: str, db: Session = Depends(get_db)) -> PublicCardOut:
         raise HTTPException(status_code=404, detail="Визитка не найдена")
 
     card, avatar_url = row
-    card.views_count += 1
+    # атомарный инкремент на стороне БД, иначе конкурентные просмотры теряются
+    card.views_count = Card.views_count + 1
     db.commit()
 
     return PublicCardOut(

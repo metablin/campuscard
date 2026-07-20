@@ -1,18 +1,16 @@
 """Эндпоинты /api/auth/*: dev-логин, VK ID, me, logout."""
+import logging
+
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.auth import vkid
 from app.auth.deps import get_current_user
-from app.auth.schemas import (
-    MeOut,
-    UserOut,
-    VKIDLoginIn,
-    card_to_out,
-    user_to_out,
-)
+from app.auth.schemas import MeOut, UserOut, VKIDLoginIn, user_to_out
+from app.schemas import card_to_out
 from app.auth.security import (
     clear_session_cookie,
     create_session_token,
@@ -21,6 +19,8 @@ from app.auth.security import (
 from app.config import settings
 from app.database import get_db
 from app.models import User
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -43,7 +43,12 @@ def login_dev(response: Response, db: Session = Depends(get_db)) -> UserOut:
     if user is None:
         user = User(vk_id=None, display_name=DEV_DISPLAY_NAME, avatar_url=None)
         db.add(user)
-        db.commit()
+        try:
+            db.commit()
+        except IntegrityError:
+            # параллельный dev-логин уже создал пользователя — берём его
+            db.rollback()
+            user = db.scalar(select(User).where(User.vk_id.is_(None)))
         db.refresh(user)
     return _login_response(user, response)
 
@@ -67,9 +72,9 @@ async def login_vkid(
             client, access_token=tokens["access_token"]
         )
     except vkid.VKIDError as exc:
-        raise HTTPException(
-            status_code=502, detail=f"Ошибка VK ID: {exc}"
-        ) from exc
+        # детали интеграции — в лог, клиенту обобщённый текст
+        logger.warning("VK ID exchange failed: %s", exc)
+        raise HTTPException(status_code=502, detail="Ошибка авторизации VK ID") from exc
 
     vk_user_id = str(profile["user_id"])
     display_name = (
@@ -86,7 +91,12 @@ async def login_vkid(
         # обновляем имя и аватар актуальными данными из VK ID
         user.display_name = display_name
         user.avatar_url = avatar_url
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        # гонка двух логинов одного vk_id: пользователь уже создан
+        db.rollback()
+        user = db.scalar(select(User).where(User.vk_id == vk_user_id))
     db.refresh(user)
     return _login_response(user, response)
 

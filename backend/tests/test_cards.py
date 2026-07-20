@@ -4,7 +4,8 @@
 /api/slug/check и /api/u/{slug}.
 """
 import pytest
-from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
 
 from app.auth.security import SESSION_COOKIE, create_session_token
 from app.database import get_db
@@ -409,3 +410,19 @@ def test_validation_allowed_url_schemes(client, url):
     response = client.put("/api/cards/me", json={**VALID_CARD, "links": links})
     assert response.status_code == 200
     assert response.json()["links"][0]["url"] == url
+
+
+def test_upsert_integrity_error_returns_409(client, monkeypatch):
+    """Гонка: slug занят параллельным запросом после предварительной проверки.
+
+    Имитируем падением commit с IntegrityError → 409 (а не 500).
+    """
+    _login(client)
+
+    def failing_commit(self):  # noqa: ARG001
+        raise IntegrityError("INSERT INTO cards ...", {}, Exception("UNIQUE slug"))
+
+    monkeypatch.setattr(Session, "commit", failing_commit)
+    response = client.put("/api/cards/me", json=VALID_CARD)
+    assert response.status_code == 409
+    assert response.json()["detail"] == "Такой slug уже занят"

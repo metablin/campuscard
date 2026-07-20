@@ -1,11 +1,16 @@
 """Модели User и Card — строго по docs/db-schema.md."""
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
+
+
+def _utcnow() -> datetime:
+    """Временные метки в UTC (согласовано с exp в JWT)."""
+    return datetime.now(timezone.utc)
 
 
 class User(Base):
@@ -17,7 +22,7 @@ class User(Base):
     display_name: Mapped[str] = mapped_column(String(128), nullable=False)
     avatar_url: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime, nullable=False, default=datetime.now
+        DateTime, nullable=False, default=_utcnow
     )
 
     # одна визитка на пользователя
@@ -45,10 +50,10 @@ class Card(Base):
     is_published: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     views_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime, nullable=False, default=datetime.now
+        DateTime, nullable=False, default=_utcnow
     )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime, nullable=False, default=datetime.now, onupdate=datetime.now
+        DateTime, nullable=False, default=_utcnow, onupdate=_utcnow
     )
 
     user: Mapped[User] = relationship(back_populates="card")

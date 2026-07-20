@@ -1,8 +1,8 @@
-fastapi
-uvicorn
-sqlalchemy
-pydantic-settings
-python-jose[cryptography]
-httpx
-pytest
-pytest-asyncio
+fastapi==0.139.2
+uvicorn==0.51.0
+sqlalchemy==2.0.51
+pydantic-settings==2.14.2
+python-jose[cryptography]==3.5.0
+httpx==0.28.1
+pytest==9.1.1
+pytest-asyncio==1.4.0

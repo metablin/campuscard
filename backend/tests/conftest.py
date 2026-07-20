@@ -1,4 +1,11 @@
 """Общие фикстуры: изолированная SQLite-БД и мок HTTP-клиента VK ID."""
+import os
+import tempfile
+
+# app.main при импорте создаёт таблицы через engine — направляем его во
+# временный файл, чтобы тесты не трогали dev-БД campuscard.db
+os.environ["DATABASE_URL"] = f"sqlite:///{tempfile.mkdtemp()}/campuscard-import.db"
+
 import httpx
 import pytest
 from fastapi.testclient import TestClient

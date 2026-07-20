@@ -53,6 +53,30 @@ def test_me_authorized(client):
     assert body["card"] is None
 
 
+def test_me_with_card(client):
+    """/api/auth/me отдаёт визитку владельца (card != null)."""
+    client.post("/api/auth/dev")
+    card = {
+        "slug": "demo-user",
+        "full_name": "Демо Пользователь",
+        "university": "",
+        "specialty": "",
+        "graduation_year": None,
+        "about": "",
+        "skills": [],
+        "links": [],
+        "theme": "default",
+    }
+    assert client.put("/api/cards/me", json=card).status_code == 200
+
+    response = client.get("/api/auth/me")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["card"]["slug"] == "demo-user"
+    assert body["card"]["public_url"] == "/u/demo-user"
+    assert body["card"]["is_published"] is False
+
+
 def test_me_expired_token(client):
     """Просроченный JWT → 401."""
     expired = jwt.encode(

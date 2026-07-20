@@ -4,6 +4,7 @@
 """
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.auth.deps import get_current_user
@@ -15,16 +16,11 @@ from app.schemas import (
     CardIn,
     CardOut,
     SlugCheckOut,
+    card_to_out,
 )
 from app.services.slug import generate_slug
 
 router = APIRouter(tags=["cards"])
-
-
-def _to_card_out(card: Card) -> CardOut:
-    """ORM → CardOut, добавляя вычисляемый public_url."""
-    columns = {c.name: getattr(card, c.name) for c in card.__table__.columns}
-    return CardOut.model_validate({**columns, "public_url": f"/u/{card.slug}"})
 
 
 def _get_own_card(db: Session, user: User) -> Card | None:
@@ -40,7 +36,7 @@ def get_my_card(
     card = _get_own_card(db, user)
     if card is None:
         raise HTTPException(status_code=404, detail="Визитка не найдена")
-    return _to_card_out(card)
+    return card_to_out(card)
 
 
 @router.put("/cards/me", response_model=CardOut)
@@ -66,9 +62,14 @@ def upsert_my_card(
     else:
         for key, value in fields.items():
             setattr(card, key, value)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        # гонка: slug занят параллельным запросом после нашей проверки выше
+        raise HTTPException(status_code=409, detail="Такой slug уже занят")
     db.refresh(card)
-    return _to_card_out(card)
+    return card_to_out(card)
 
 
 @router.post("/cards/me/publish")

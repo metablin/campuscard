@@ -8,6 +8,13 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY app ./app
 
+# non-root: приложению нужна запись только в /app (локальный SQLite)
+# и /data (том compose; владелец каталога копируется в named volume)
+RUN useradd --create-home app \
+    && mkdir -p /data \
+    && chown -R app:app /app /data
+USER app
+
 EXPOSE 8000
 
 # SQLite-файл создаётся при старте (Base.metadata.create_all)
