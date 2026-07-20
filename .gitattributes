@@ -1,0 +1,10 @@
+# Единые окончания строк LF во всех текстовых файлах (в т.ч. при checkout на Windows).
+# Иначе eslint-правило linebreak-style падает на CRLF после клонирования с core.autocrlf=true.
+* text=auto eol=lf
+
+# Бинарные файлы — без преобразований
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.ico binary
+*.svg text eol=lf

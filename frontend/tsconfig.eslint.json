@@ -1,0 +1,6 @@
+{
+  "extends": "./tsconfig.app.json",
+  "include": ["src", ".eslintrc.cjs"],
+  // eslint проверяет и тесты, поэтому исключения tsconfig.app.json отменяем
+  "exclude": []
+}
