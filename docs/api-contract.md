@@ -55,7 +55,8 @@ id.vk.com/about/business/go/docs/ru/vkid/latest/vk-id/connection/api-description
    `access_token`, `client_id`. Ответ: `{ "user": { "user_id", "first_name",
    "last_name", "avatar", ... } }`.
 3. Ошибки обоих эндпоинтов: `{ "error", "error_description" }` → бэкенд
-   отвечает 502 с текстом из `error_description`.
+   отвечает 502 «Ошибка авторизации VK ID» (детали — в лог бэкенда,
+   клиенту внутренние тексты внешнего сервиса не раскрываются).
 
 ### POST /api/auth/logout
 Авторизация: да. Удаляет куку. Ответ 200: `{ "ok": true }`.

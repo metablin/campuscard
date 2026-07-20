@@ -43,12 +43,7 @@ def login_dev(response: Response, db: Session = Depends(get_db)) -> UserOut:
     if user is None:
         user = User(vk_id=None, display_name=DEV_DISPLAY_NAME, avatar_url=None)
         db.add(user)
-        try:
-            db.commit()
-        except IntegrityError:
-            # параллельный dev-логин уже создал пользователя — берём его
-            db.rollback()
-            user = db.scalar(select(User).where(User.vk_id.is_(None)))
+        db.commit()
         db.refresh(user)
     return _login_response(user, response)
 
@@ -97,6 +92,10 @@ async def login_vkid(
         # гонка двух логинов одного vk_id: пользователь уже создан
         db.rollback()
         user = db.scalar(select(User).where(User.vk_id == vk_user_id))
+        if user is None:
+            raise HTTPException(
+                status_code=409, detail="Конфликт входа, попробуйте ещё раз"
+            )
     db.refresh(user)
     return _login_response(user, response)
 
