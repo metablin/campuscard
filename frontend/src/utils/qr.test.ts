@@ -14,9 +14,9 @@ describe('utils/qr', () => {
 
   it('createQrSvg включает логотип VK (isShowLogo)', () => {
     const svg = createQrSvg(url);
-    // логотип встраивается в SVG: разметки заметно больше, чем у «голого» кода
-    const MIN_SVG_LEN_WITH_LOGO = 1000;
-    expect(svg.length).toBeGreaterThan(MIN_SVG_LEN_WITH_LOGO);
+    // vk-qr встраивает логотип как <use href="#vk_logo…"> — проверяем
+    // конкретную разметку, а не косвенные признаки вроде длины SVG
+    expect(svg).toMatch(/<use[^>]*href="#vk_logo/);
   });
 
   it('qrSvgDataUrl — data URL с utf-8 и url-encoded SVG', () => {

@@ -99,8 +99,9 @@ describe('PublicCardPage', () => {
   it('показывает спиннер, пока идёт загрузка', () => {
     getCardMock.mockReturnValue(new Promise(() => undefined)); // никогда не resolves
     renderPage('ivan-petrov');
+    // индикатор загрузки реально отображается (Spinner VKUI имеет role=status)
+    expect(screen.getByRole('status')).toBeInTheDocument();
     expect(screen.queryByText('Иван Петров')).not.toBeInTheDocument();
-    // после загрузки данных страница не ломается
     return waitFor(() => expect(getCardMock).toHaveBeenCalled());
   });
 });
