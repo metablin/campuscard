@@ -9,6 +9,7 @@ import {
 import type { ReactNode } from 'react';
 
 import { authApi } from '../api/auth';
+import { ApiError } from '../api/client';
 import type { CardOut, UserOut } from '../api/types';
 
 interface AuthContextValue {
@@ -16,6 +17,8 @@ interface AuthContextValue {
   user: UserOut | null;
   card: CardOut | null;
   loading: boolean;
+  /** Сбой запроса /api/auth/me (сеть/5xx) — это НЕ разлогин. */
+  error: boolean;
   /** Повторно запросить /api/auth/me (после входа/изменения визитки). */
   refresh: () => Promise<void>;
   setCard: (card: CardOut | null) => void;
@@ -24,20 +27,28 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+const HTTP_UNAUTHORIZED = 401;
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<UserOut | null>(null);
   const [card, setCard] = useState<CardOut | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
 
   const refresh = useCallback(async () => {
     try {
       const me = await authApi.me();
       setUser(me.user);
       setCard(me.card);
-    } catch {
-      // 401 — сессии нет; прочие ошибки тоже считаем «не залогинен»
-      setUser(null);
-      setCard(null);
+      setError(false);
+    } catch (err) {
+      if (err instanceof ApiError && err.status === HTTP_UNAUTHORIZED) {
+        // 401 — сессии нет; сетевой сбой/5xx разлогином не считаем
+        setUser(null);
+        setCard(null);
+      } else {
+        setError(true);
+      }
     }
   }, []);
 
@@ -55,8 +66,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ user, card, loading, refresh, setCard, logout }),
-    [user, card, loading, refresh, logout],
+    () => ({ user, card, loading, error, refresh, setCard, logout }),
+    [user, card, loading, error, refresh, logout],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

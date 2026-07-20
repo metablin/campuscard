@@ -33,6 +33,7 @@ import { publicApi } from '../api/public';
 import type { LinkType, PublicCardOut } from '../api/types';
 import { buildVcf } from '../utils/vcard';
 import { CARD_THEMES } from './edit/themes';
+import type { CardThemeStyle } from './edit/themes';
 import { isValidUrlScheme } from './edit/validation';
 
 const HTTP_NOT_FOUND = 404;
@@ -52,7 +53,8 @@ function initials(fullName: string): string {
     .split(/\s+/)
     .filter(Boolean)
     .slice(0, MAX_INITIALS_PARTS)
-    .map((part) => part.charAt(0).toUpperCase())
+    // [...part][0], а не charAt(0): charAt ломает суррогатные пары (эмодзи в имени)
+    .map((part) => [...part][0]?.toUpperCase() ?? '')
     .join('');
 }
 
@@ -72,20 +74,35 @@ export function PublicCardPage() {
       setLoading(false);
       return;
     }
+    let cancelled = false;
     setLoading(true);
     setNotFound(false);
     setError(null);
     publicApi
       .getCard(slug)
-      .then(setCard)
+      .then((data) => {
+        if (!cancelled) {
+          setCard(data);
+        }
+      })
       .catch((err: unknown) => {
+        if (cancelled) {
+          return;
+        }
         if (err instanceof ApiError && err.status === HTTP_NOT_FOUND) {
           setNotFound(true);
         } else {
           setError(err instanceof ApiError ? err.message : 'Не удалось загрузить визитку');
         }
       })
-      .finally(() => setLoading(false));
+      .finally(() => {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [slug, retryKey]);
 
   const handleRetry = () => setRetryKey((key) => key + 1);
@@ -127,7 +144,10 @@ export function PublicCardPage() {
     );
   }
 
-  const theme = CARD_THEMES[card.theme];
+  // тема вне списка (дрейф контракта) не должна ронять страницу:
+  // индексируем как Record<string, ...>, т.к. бэкенд может вернуть значение вне union-типа
+  const theme =
+    (CARD_THEMES as Record<string, CardThemeStyle>)[card.theme] ?? CARD_THEMES.default;
   const safeLinks = card.links.filter((link) => isValidUrlScheme(link.url));
 
   const handleDownloadVcf = () => {
@@ -137,7 +157,8 @@ export function PublicCardPage() {
     link.href = url;
     link.download = `${card.slug}.vcf`;
     link.click();
-    URL.revokeObjectURL(url);
+    // отложенный revoke: синхронный обрывает скачивание в Firefox
+    setTimeout(() => URL.revokeObjectURL(url), 0);
   };
 
   const studyLine = [card.university, card.specialty].filter(Boolean).join(' · ');
@@ -194,9 +215,9 @@ export function PublicCardPage() {
 
             {safeLinks.length > 0 && (
               <Group>
-                {safeLinks.map((link) => (
+                {safeLinks.map((link, index) => (
                   <CellButton
-                    key={`${link.type}-${link.url}`}
+                    key={`${index}-${link.type}-${link.url}`}
                     before={LINK_ICONS[link.type]}
                     href={link.url}
                     target="_blank"
@@ -223,7 +244,16 @@ export function PublicCardPage() {
           </Card>
 
           <Footer>
-            Создай свою визитку на <Link href="/">CampusCard</Link>
+            Создай свою визитку на{' '}
+            <Link
+              href="/"
+              onClick={(e) => {
+                e.preventDefault();
+                navigate('/');
+              }}
+            >
+              CampusCard
+            </Link>
           </Footer>
         </div>
       </Div>

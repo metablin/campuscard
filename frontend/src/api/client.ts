@@ -57,7 +57,9 @@ export async function apiFetch<T>(
     throw new ApiError(response.status, detail);
   }
 
-  return (await response.json()) as T;
+  // 204/пустое тело — не ошибка, хотя JSON там нет
+  const text = await response.text();
+  return (text ? JSON.parse(text) : undefined) as T;
 }
 
 /** POST без тела (dev-логин, publish, logout). */

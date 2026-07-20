@@ -1,6 +1,13 @@
 import type { ReactNode } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
-import { Panel, PanelHeader, PanelSpinner } from '@vkontakte/vkui';
+import {
+  Button,
+  Group,
+  Panel,
+  PanelHeader,
+  PanelSpinner,
+  Placeholder,
+} from '@vkontakte/vkui';
 
 import { useAuth } from './AuthContext';
 
@@ -9,7 +16,7 @@ import { useAuth } from './AuthContext';
  * на /login с возвратом на исходную страницу (?from=).
  */
 export function RequireAuth({ children }: { children: ReactNode }) {
-  const { user, loading } = useAuth();
+  const { user, loading, error, refresh } = useAuth();
   const location = useLocation();
 
   if (loading) {
@@ -17,6 +24,27 @@ export function RequireAuth({ children }: { children: ReactNode }) {
       <Panel>
         <PanelHeader>CampusCard</PanelHeader>
         <PanelSpinner size="m" />
+      </Panel>
+    );
+  }
+
+  // сбой сети/5xx при проверке сессии — предлагаем повторить, не разлогинивая
+  if (error) {
+    return (
+      <Panel>
+        <PanelHeader>CampusCard</PanelHeader>
+        <Group>
+          <Placeholder
+            title="Не удалось проверить сессию"
+            action={
+              <Button size="m" onClick={() => void refresh()}>
+                Повторить
+              </Button>
+            }
+          >
+            Проверь подключение к интернету и попробуй ещё раз.
+          </Placeholder>
+        </Group>
       </Panel>
     );
   }

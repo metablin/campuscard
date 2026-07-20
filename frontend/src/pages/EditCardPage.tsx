@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react';
-import type { ChangeEvent, ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import type { ChangeEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Button,
@@ -16,18 +16,13 @@ import {
   PanelSpinner,
   SegmentedControl,
   Select,
-  Snackbar,
   Spacing,
   Textarea,
   ChipsInput,
   IconButton,
 } from '@vkontakte/vkui';
 import type { ChipOption } from '@vkontakte/vkui';
-import {
-  Icon20Add,
-  Icon20CheckCircleOutline,
-  Icon20DeleteOutline,
-} from '@vkontakte/icons';
+import { Icon20Add, Icon20DeleteOutline } from '@vkontakte/icons';
 
 import { cardsApi } from '../api/cards';
 import { ApiError } from '../api/client';
@@ -35,18 +30,25 @@ import type { CardIn, CardLink, CardTheme, LinkType } from '../api/types';
 import { useAuth } from '../auth/AuthContext';
 import { PageContainer } from './PageContainer';
 import { THEME_OPTIONS } from './edit/themes';
-import { slugError, validateCard } from './edit/validation';
+import {
+  MAX_ABOUT,
+  MAX_FULL_NAME,
+  MAX_LABEL_LEN,
+  MAX_LINKS,
+  MAX_SKILLS,
+  MAX_TEXT,
+  MAX_URL_LEN,
+  MAX_YEAR,
+  MIN_YEAR,
+  slugError,
+  validateCard,
+} from './edit/validation';
 
-const MAX_LINKS = 10;
-const MAX_SKILLS = 15;
-const MAX_ABOUT = 1000;
-const MIN_YEAR = 2020;
-const YEARS_COUNT = 16;
 const HTTP_CONFLICT = 409;
 
 const YEAR_OPTIONS = [
   { value: '', label: 'Не указан' },
-  ...Array.from({ length: YEARS_COUNT }, (_, i) => {
+  ...Array.from({ length: MAX_YEAR - MIN_YEAR + 1 }, (_, i) => {
     const year = MIN_YEAR + i;
     return { value: String(year), label: String(year) };
   }),
@@ -97,7 +99,7 @@ function LinkRow({ link, onChange, onRemove }: LinkRowProps) {
           value={link.label}
           onChange={(e) => onChange({ label: e.target.value })}
           placeholder="Подпись"
-          maxLength={64}
+          maxLength={MAX_LABEL_LEN}
         />
       </div>
       <div style={{ flex: 2, minWidth: 200 }}>
@@ -105,7 +107,7 @@ function LinkRow({ link, onChange, onRemove }: LinkRowProps) {
           value={link.url}
           onChange={(e) => onChange({ url: e.target.value })}
           placeholder="https://…"
-          maxLength={512}
+          maxLength={MAX_URL_LEN}
         />
       </div>
       <IconButton aria-label="Удалить ссылку" onClick={onRemove}>
@@ -125,23 +127,33 @@ export function EditCardPage() {
   const [slugPending, setSlugPending] = useState(false);
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState<string[]>([]);
-  const [snackbar, setSnackbar] = useState<ReactNode>(null);
   const [skillsInput, setSkillsInput] = useState('');
+
+  // актуальные значения для асинхронных колбэков (гонки slug, см. ниже)
+  const slugTouchedRef = useRef(false);
+  const formRef = useRef<CardIn | null>(null);
+  formRef.current = form;
+
+  const markSlugTouched = () => {
+    slugTouchedRef.current = true;
+    setSlugTouched(true);
+  };
 
   // инициализация формы из загруженной визитки (один раз)
   const [initialized, setInitialized] = useState(false);
-  useMemo(() => {
+  useEffect(() => {
     if (!loading && !initialized) {
       if (card) {
         const { slug, full_name, university, specialty, graduation_year, about, skills, links, theme } =
           card;
         setForm({ slug, full_name, university, specialty, graduation_year, about, skills, links, theme });
-        setSlugTouched(true);
+        markSlugTouched();
       } else {
         setForm({ ...EMPTY_CARD });
       }
       setInitialized(true);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading, card, initialized]);
 
   const skillOptions = useMemo<ChipOption[]>(
@@ -170,7 +182,12 @@ export function EditCardPage() {
       cardsApi
         .generateSlug(form.full_name.trim())
         .then(({ slug }) => {
+          // пока летел запрос, пользователь мог ввести slug вручную — не затираем
+          if (slugTouchedRef.current) {
+            return;
+          }
           update('slug', slug);
+          markSlugTouched();
           setSlugStatus({ kind: 'idle' });
         })
         .catch(() => undefined)
@@ -179,7 +196,7 @@ export function EditCardPage() {
   };
 
   const handleSlugChange = (event: ChangeEvent<HTMLInputElement>) => {
-    setSlugTouched(true);
+    markSlugTouched();
     update('slug', event.target.value.toLowerCase());
     setSlugStatus({ kind: 'idle' });
   };
@@ -190,10 +207,15 @@ export function EditCardPage() {
       setSlugStatus({ kind: 'error', text: err });
       return;
     }
+    const checkedSlug = form.slug;
     setSlugPending(true);
     cardsApi
-      .checkSlug(form.slug)
+      .checkSlug(checkedSlug)
       .then(({ available, reason }) => {
+        // ответ относится к старому значению — игнорируем
+        if (formRef.current?.slug !== checkedSlug) {
+          return;
+        }
         if (available) {
           setSlugStatus({ kind: 'ok' });
         } else {
@@ -239,21 +261,33 @@ export function EditCardPage() {
   };
 
   const handleSubmit = () => {
-    const validationErrors = validateCard(form);
+    if (saving) {
+      return;
+    }
+    // нормализуем строки до валидации и отправки
+    const payload: CardIn = {
+      ...form,
+      full_name: form.full_name.trim(),
+      university: form.university.trim(),
+      specialty: form.specialty.trim(),
+      about: form.about.trim(),
+      skills: form.skills.map((skill) => skill.trim()).filter(Boolean),
+      links: form.links.map((link) => ({
+        ...link,
+        label: link.label.trim(),
+        url: link.url.trim(),
+      })),
+    };
+    const validationErrors = validateCard(payload);
     setErrors(validationErrors);
     if (validationErrors.length > 0) {
       return;
     }
     setSaving(true);
     cardsApi
-      .update({ ...form, full_name: form.full_name.trim() })
+      .update(payload)
       .then((saved) => {
         setCard(saved);
-        setSnackbar(
-          <Snackbar onClose={() => setSnackbar(null)} before={<Icon20CheckCircleOutline />}>
-            Визитка сохранена
-          </Snackbar>,
-        );
         navigate('/app');
       })
       .catch((error: unknown) => {
@@ -282,7 +316,7 @@ export function EditCardPage() {
                 onChange={(e) => update('full_name', e.target.value)}
                 onBlur={handleFullNameBlur}
                 placeholder="Даниил Дёмкин"
-                maxLength={128}
+                maxLength={MAX_FULL_NAME}
               />
             </FormItem>
 
@@ -314,7 +348,7 @@ export function EditCardPage() {
                 value={form.university}
                 onChange={(e) => update('university', e.target.value)}
                 placeholder="МГУ"
-                maxLength={256}
+                maxLength={MAX_TEXT}
               />
             </FormItem>
 
@@ -323,7 +357,7 @@ export function EditCardPage() {
                 value={form.specialty}
                 onChange={(e) => update('specialty', e.target.value)}
                 placeholder="Прикладная математика"
-                maxLength={256}
+                maxLength={MAX_TEXT}
               />
             </FormItem>
 
@@ -373,7 +407,7 @@ export function EditCardPage() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {form.links.map((link, index) => (
                   <LinkRow
-                    key={`${index}-${link.type}-${link.label}`}
+                    key={index}
                     link={link}
                     onChange={(patch) => updateLink(index, patch)}
                     onRemove={() => removeLink(index)}
@@ -414,7 +448,6 @@ export function EditCardPage() {
           </Div>
         </Group>
       </PageContainer>
-      {snackbar}
     </Panel>
   );
 }

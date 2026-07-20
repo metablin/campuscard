@@ -27,7 +27,8 @@ FRONT_PID=$!
 cleanup() {
   kill "$BACK_PID" "$FRONT_PID" 2>/dev/null || true
 }
-trap cleanup INT TERM
+# EXIT — чтобы дочерние процессы не остались сиротами при аварийном выходе
+trap cleanup INT TERM EXIT
 
-wait -n "$BACK_PID" "$FRONT_PID"
-cleanup
+# plain wait: wait -n требует bash ≥ 4.3, а на macOS системный bash — 3.2
+wait "$BACK_PID" "$FRONT_PID"

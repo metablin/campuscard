@@ -22,16 +22,16 @@ const LINK_TYPES: LinkType[] = ['vk', 'telegram', 'email', 'phone', 'github', 's
 
 const ALLOWED_URL_SCHEMES = ['https://', 'http://', 'mailto:', 'tel:'];
 
-const MAX_FULL_NAME = 128;
-const MAX_TEXT = 256;
-const MAX_ABOUT = 1000;
-const MAX_SKILLS = 15;
-const MAX_SKILL_LEN = 40;
-const MAX_LINKS = 10;
-const MAX_LABEL_LEN = 64;
-const MAX_URL_LEN = 512;
-const MIN_YEAR = 2020;
-const MAX_YEAR = 2035;
+export const MAX_FULL_NAME = 128;
+export const MAX_TEXT = 256;
+export const MAX_ABOUT = 1000;
+export const MAX_SKILLS = 15;
+export const MAX_SKILL_LEN = 40;
+export const MAX_LINKS = 10;
+export const MAX_LABEL_LEN = 64;
+export const MAX_URL_LEN = 512;
+export const MIN_YEAR = 2020;
+export const MAX_YEAR = 2035;
 
 export function isValidUrlScheme(url: string): boolean {
   return ALLOWED_URL_SCHEMES.some((scheme) => url.startsWith(scheme));

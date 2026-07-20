@@ -19,22 +19,23 @@ export async function copyToClipboard(text: string): Promise<boolean> {
     }
   }
 
+  const textarea = document.createElement('textarea');
+  textarea.value = text;
+  // вне вьюпорта и без флэша выделения
+  textarea.style.position = 'fixed';
+  textarea.style.top = '0';
+  textarea.style.left = '0';
+  textarea.style.opacity = '0';
+  textarea.readOnly = true;
+  document.body.appendChild(textarea);
   try {
-    const textarea = document.createElement('textarea');
-    textarea.value = text;
-    // вне вьюпорта и без флэша выделения
-    textarea.style.position = 'fixed';
-    textarea.style.top = '0';
-    textarea.style.left = '0';
-    textarea.style.opacity = '0';
-    textarea.readOnly = true;
-    document.body.appendChild(textarea);
     textarea.focus();
     textarea.select();
-    const ok = document.execCommand('copy');
-    textarea.remove();
-    return ok;
+    return document.execCommand('copy');
   } catch {
     return false;
+  } finally {
+    // узел удаляем даже при исключении в focus/select/execCommand
+    textarea.remove();
   }
 }

@@ -20,6 +20,7 @@ import { authApi } from '../api/auth';
 import { ApiError } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 import { isVkAuthEnabled, loginWithVkId } from '../auth/vkid';
+import { safeFromPath } from '../utils/redirect';
 import { PageContainer } from './PageContainer';
 
 /** Показывать dev-вход только при VITE_DEV_AUTH=true в .env фронта. */
@@ -39,8 +40,7 @@ export function LoginPage() {
   }
 
   // куда вернуться после входа (только внутренние пути)
-  const from = searchParams.get('from');
-  const target = from && from.startsWith('/') && !from.startsWith('//') ? from : '/app';
+  const target = safeFromPath(searchParams.get('from'));
 
   const showError = (message: string) => {
     setSnackbar(
