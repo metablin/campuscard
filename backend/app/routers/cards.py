@@ -102,7 +102,7 @@ def delete_my_card(
 
 @router.get("/slug/check", response_model=SlugCheckOut)
 def check_slug(
-    slug: str = Query(...),
+    slug: str = Query(..., max_length=40),
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ) -> SlugCheckOut:

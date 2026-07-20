@@ -56,3 +56,10 @@ export function getVkCodeVerifier(): string | null {
 export function getVkState(): string | null {
   return readSdkCookie('state');
 }
+
+/** Очистка служебных куки SDK после завершения входа. */
+export function clearVkSdkCookies(): void {
+  for (const name of ['state', 'codeVerifier']) {
+    document.cookie = `vkid_sdk:${name}=; max-age=0; path=/`;
+  }
+}

@@ -6,7 +6,7 @@ import {
   useMemo,
   useState,
 } from 'react';
-import type { ReactNode } from 'react';
+import type { Dispatch, ReactNode, SetStateAction } from 'react';
 
 import { authApi } from '../api/auth';
 import { ApiError } from '../api/client';
@@ -21,7 +21,8 @@ interface AuthContextValue {
   error: boolean;
   /** Повторно запросить /api/auth/me (после входа/изменения визитки). */
   refresh: () => Promise<void>;
-  setCard: (card: CardOut | null) => void;
+  /** Setter состояния: принимает значение или updater (для сравнения updated_at). */
+  setCard: Dispatch<SetStateAction<CardOut | null>>;
   logout: () => Promise<void>;
 }
 

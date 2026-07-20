@@ -52,7 +52,22 @@ export function AppPage() {
   // если визитка уже есть — подгружаем актуальную (views_count и т.п.)
   useEffect(() => {
     if (!loading && user && card) {
-      cardsApi.getMy().then(setCard).catch(() => undefined);
+      let cancelled = false;
+      cardsApi
+        .getMy()
+        .then((fresh) => {
+          if (cancelled) {
+            return;
+          }
+          // ответ мог прийти позже, чем редактор сохранил более свежую версию
+          setCard((prev) =>
+            prev && fresh.updated_at < prev.updated_at ? prev : fresh,
+          );
+        })
+        .catch(() => undefined);
+      return () => {
+        cancelled = true;
+      };
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading, user]);

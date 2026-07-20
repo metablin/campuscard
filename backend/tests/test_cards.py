@@ -11,6 +11,7 @@ from app.auth.security import SESSION_COOKIE, create_session_token
 from app.database import get_db
 from app.main import app
 from app.models import User
+from app.schemas import RESERVED_SLUGS as SCHEMAS_RESERVED
 
 # Валидное тело PUT /api/cards/me — база для всех тестов
 VALID_CARD = {
@@ -39,7 +40,8 @@ PUBLIC_FIELDS = {
     "avatar_url",
 }
 
-RESERVED_SLUGS = ["admin", "api", "login", "u", "app", "edit", "auth"]
+# зеркало app.schemas.RESERVED_SLUGS — берём из кода, а не дублируем литерал
+RESERVED_SLUGS = sorted(SCHEMAS_RESERVED)
 
 
 def _login(client):

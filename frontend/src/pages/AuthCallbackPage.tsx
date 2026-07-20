@@ -12,7 +12,7 @@ import {
 import { authApi } from '../api/auth';
 import { ApiError } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
-import { getVkCodeVerifier, getVkState } from '../auth/vkid';
+import { clearVkSdkCookies, getVkCodeVerifier, getVkState } from '../auth/vkid';
 
 /**
  * Callback VK ID: id.vk.com возвращает сюда ?code=&state=&device_id=.
@@ -55,6 +55,8 @@ export function AuthCallbackPage() {
       setError('Не найден code_verifier. Попробуй войти ещё раз.');
       return;
     }
+    // verifier/state одноразовые — куки SDK больше не нужны
+    clearVkSdkCookies();
 
     authApi
       .loginVkid(code, codeVerifier, deviceId)
